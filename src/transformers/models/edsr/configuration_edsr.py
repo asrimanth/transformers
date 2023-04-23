@@ -31,10 +31,6 @@ class EDSRConfig(PretrainedConfig):
             Number of feature maps.
         res_scale (`int`, *optional*, defaults to 1):
             Residual scaling.
-        shift_mean (`bool`, *optional*, defaults to True):
-            whether or not to subtract pixel mean from the input
-        self_ensemble (`bool`, *optional*, defaults to True):
-            whether or not to use self-ensemble method for test
 
     Example:
     ```python
@@ -63,8 +59,6 @@ class EDSRConfig(PretrainedConfig):
         rgb_range: int = 255,
         rgb_mean: tuple = (0.4488, 0.4371, 0.4040),
         rgb_std: tuple = (1.0, 1.0, 1.0),
-        shift_mean: bool = True,
-        self_ensemble: bool = True,
         **kwargs,
     ):
         # Config should not be importable.
@@ -75,11 +69,9 @@ class EDSRConfig(PretrainedConfig):
         self.num_res_block = num_res_block
         self.num_feature_maps = num_feature_maps
         self.res_scale = res_scale
-        self.shift_mean = shift_mean
         self.rgb_range = rgb_range
         self.rgb_mean = rgb_mean
         self.rgb_std = rgb_std
-        self.self_ensemble = self_ensemble
 
         super().__init__(**kwargs)
 

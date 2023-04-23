@@ -91,19 +91,21 @@ def convert_edsr_checkpoint(checkpoint_url: str, pytorch_dump_folder_path: str, 
 
     SAMPLE_IMAGE_URL = "https://lh4.googleusercontent.com/-Anmw5df4gj0/AAAAAAAAAAI/AAAAAAAAAAc/6HxU8XFLnQE/photo.jpg64"
 
+    url_to_name_dict = {
+        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x2-1bc95232.pt": "edsr_baseline_x2",
+        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x3-abf2a44e.pt": "edsr_baseline_x3",
+        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x4-6b446fab.pt": "edsr_baseline_x4",
+    }
     url_to_slice_dict = {
         "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x2-1bc95232.pt": torch.tensor(
-            [[146.6154, 128.6703, 73.1800], [112.6714, 90.5857, 68.5255], [56.6039, 62.8006, 77.7706]]
+            [[ 1.0845,  0.1934,  0.1843],[0.6235,  0.2663,  0.0347],[0.5703, -0.0288,  0.1822]]
         ),
         "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x3-abf2a44e.pt": torch.tensor(
-            [[139.0591, 136.4635, 126.6529], [133.7725, 126.7542, 110.9417], [108.5025, 99.2904, 80.3906]]
+            [[1.8288, 0.5871, 0.2986],[0.7461, 0.6465, 0.1928],[0.4508, 0.3917, 0.3607]]
         ),
-        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x4-6b446fab.pt": torch.tensor(
-            [[143.0898, 140.2990, 135.3582], [140.3488, 135.8599, 128.9865], [128.6764, 121.7250, 111.3058]]
+        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x4-6b446fab.pt": torch.tensor([
+            [1.6611, 0.6265, 0.3864],[0.9503, 0.3109, 0.1029],[0.5610, 0.3287, 0.4297]]
         ),
-        "https://cv.snu.ac.kr/research/EDSR/models/edsr_x2-0edfb8a3.pt": 0,
-        "https://cv.snu.ac.kr/research/EDSR/models/edsr_x3-ea3ef2c6.pt": 0,
-        "https://cv.snu.ac.kr/research/EDSR/models/edsr_x4-4f62e9ef.pt": 0,
     }
 
     model = EDSRForImageSuperResolution(config)
@@ -133,13 +135,10 @@ def convert_edsr_checkpoint(checkpoint_url: str, pytorch_dump_folder_path: str, 
             raise ValueError(f"Unexpected key {key} in state_dict")
 
     # verify values
-    EDSRImageProcessor()
+    processor = EDSRImageProcessor()
     pixel_values = load_sample_image(SAMPLE_IMAGE_URL)
+    pixel_values = processor(pixel_values, return_tensors="pt").pixel_values
 
-    # pixel_values = processor(image).pixel_values
-
-    # pixel_values = torchvision.transforms.functional.to_tensor(image).unsqueeze(0)
-    print(pixel_values.shape)
     outputs = model(pixel_values)
     print(outputs.reconstruction.shape)
     save_image(outputs.reconstruction)
@@ -156,6 +155,17 @@ def convert_edsr_checkpoint(checkpoint_url: str, pytorch_dump_folder_path: str, 
     ), f"Shape of reconstruction should be {expected_shape}, but is {outputs.reconstruction.shape}"
     assert torch.allclose(outputs.reconstruction[0, 0, :3, :3], expected_slice, atol=1e-3)
     print("Looks ok!")
+
+    model_name = url_to_name_dict[checkpoint_url]
+    if pytorch_dump_folder_path is not None:
+        print(f"Saving model {model_name} to {pytorch_dump_folder_path}")
+        model.save_pretrained(pytorch_dump_folder_path)
+        print(f"Saving image processor to {pytorch_dump_folder_path}")
+        processor.save_pretrained(pytorch_dump_folder_path)
+
+    if push_to_hub:
+        model.push_to_hub(f"asrimanth/{model_name}")
+        processor.push_to_hub(f"asrimanth/{model_name}")
 
 
 if __name__ == "__main__":

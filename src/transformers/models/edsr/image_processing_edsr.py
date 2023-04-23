@@ -13,17 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Image processor class for EDSR."""
+# Taken from Swin2sr Image Processor at image_processing_swin2sr.py
 
 from typing import Optional, Union
 
 import numpy as np
 
-from transformers.utils.generic import TensorType
-
 from ...image_processing_utils import BaseImageProcessor, BatchFeature
 from ...image_transforms import get_image_size, pad, rescale, to_channel_dimension_format
-from ...image_utils import ChannelDimension, ImageInput, is_batched, to_numpy_array, valid_images
-from ...utils import logging
+from ...image_utils import ChannelDimension, ImageInput, make_list_of_images, to_numpy_array, valid_images
+from ...utils import TensorType, logging
 
 
 logger = logging.get_logger(__name__)
@@ -31,8 +30,9 @@ logger = logging.get_logger(__name__)
 
 class EDSRImageProcessor(BaseImageProcessor):
     r"""
+    Constructs an EDSR image processor.
+
     Args:
-    Constructs a EDSR image processor.
         do_rescale (`bool`, *optional*, defaults to `True`):
             Whether to rescale the image by the specified scale `rescale_factor`. Can be overridden by the `do_rescale`
             parameter in the `preprocess` method.
@@ -48,7 +48,7 @@ class EDSRImageProcessor(BaseImageProcessor):
         do_rescale: bool = True,
         rescale_factor: Union[int, float] = 1 / 255,
         do_pad: bool = True,
-        pad_size: int = 8,
+        pad_size: int = 4,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -62,8 +62,9 @@ class EDSRImageProcessor(BaseImageProcessor):
         self, image: np.ndarray, scale: float, data_format: Optional[Union[str, ChannelDimension]] = None, **kwargs
     ) -> np.ndarray:
         """
-        Args:
         Rescale an image by a scale factor. image = image * scale.
+
+        Args:
             image (`np.ndarray`):
                 Image to rescale.
             scale (`float`):
@@ -73,6 +74,7 @@ class EDSRImageProcessor(BaseImageProcessor):
                 image is used. Can be one of:
                 - `"channels_first"` or `ChannelDimension.FIRST`: image in (num_channels, height, width) format.
                 - `"channels_last"` or `ChannelDimension.LAST`: image in (height, width, num_channels) format.
+
         Returns:
             `np.ndarray`: The rescaled image.
         """
@@ -80,8 +82,9 @@ class EDSRImageProcessor(BaseImageProcessor):
 
     def pad(self, image: np.ndarray, size: int, data_format: Optional[Union[str, ChannelDimension]] = None):
         """
-        Args:
         Pad an image to make the height and width divisible by `size`.
+
+        Args:
             image (`np.ndarray`):
                 Image to pad.
             size (`int`):
@@ -91,6 +94,7 @@ class EDSRImageProcessor(BaseImageProcessor):
                 image is used. Can be one of:
                 - `"channels_first"` or `ChannelDimension.FIRST`: image in (num_channels, height, width) format.
                 - `"channels_last"` or `ChannelDimension.LAST`: image in (height, width, num_channels) format.
+
         Returns:
             `np.ndarray`: The padded image.
         """
@@ -112,8 +116,9 @@ class EDSRImageProcessor(BaseImageProcessor):
         **kwargs,
     ):
         """
-        Args:
         Preprocess an image or batch of images.
+
+        Args:
             images (`ImageInput`):
                 Image to preprocess.
             do_rescale (`bool`, *optional*, defaults to `self.do_rescale`):
@@ -142,8 +147,7 @@ class EDSRImageProcessor(BaseImageProcessor):
         do_pad = do_pad if do_pad is not None else self.do_pad
         pad_size = pad_size if pad_size is not None else self.pad_size
 
-        if not is_batched(images):
-            images = [images]
+        images = make_list_of_images(images)
 
         if not valid_images(images):
             raise ValueError(
