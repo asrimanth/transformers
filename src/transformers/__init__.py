@@ -5072,11 +5072,11 @@ if TYPE_CHECKING:
             DPTPreTrainedModel,
         )
         from .models.edsr import (
-             EDSR_PRETRAINED_MODEL_ARCHIVE_LIST,
-             EDSRForImageSuperResolution,
-             EDSRModel,
-             EDSRPreTrainedModel,
-         )
+            EDSR_PRETRAINED_MODEL_ARCHIVE_LIST,
+            EDSRForImageSuperResolution,
+            EDSRModel,
+            EDSRPreTrainedModel,
+        )
         from .models.efficientformer import (
             EFFICIENTFORMER_PRETRAINED_MODEL_ARCHIVE_LIST,
             EfficientFormerForImageClassification,

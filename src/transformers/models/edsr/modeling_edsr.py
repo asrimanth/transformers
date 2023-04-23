@@ -5,7 +5,7 @@ import torch
 import torch.utils.checkpoint
 from torch import nn
 
-from ...modeling_outputs import ImageSuperResolutionOutput
+from ...modeling_outputs import BaseModelOutputWithNoAttention, ImageSuperResolutionOutput
 from ...modeling_utils import PreTrainedModel
 from ...utils import (
     add_start_docstrings,
@@ -16,15 +16,6 @@ from ...utils import (
 from .configuration_edsr import EDSRConfig
 
 
-# url = {
-#     "r16f64x2": "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x2-1bc95232.pt",
-#     "r16f64x3": "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x3-abf2a44e.pt",
-#     "r16f64x4": "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x4-6b446fab.pt",
-#     "r32f256x2": "https://cv.snu.ac.kr/research/EDSR/models/edsr_x2-0edfb8a3.pt",
-#     "r32f256x3": "https://cv.snu.ac.kr/research/EDSR/models/edsr_x3-ea3ef2c6.pt",
-#     "r32f256x4": "https://cv.snu.ac.kr/research/EDSR/models/edsr_x4-4f62e9ef.pt",
-# }
-
 logger = logging.get_logger(__name__)
 
 # General docstring
@@ -33,7 +24,6 @@ _FEAT_EXTRACTOR_FOR_DOC = "AutoFeatureExtractor"
 
 # Base docstring
 # _CHECKPOINT_FOR_DOC = ""
-_EXPECTED_OUTPUT_SHAPE = [8, 3, 512, 512]
 
 
 EDSR_PRETRAINED_MODEL_ARCHIVE_LIST = {
@@ -51,7 +41,6 @@ def default_conv(in_channels, out_channels, kernel_size, bias=True):
     return nn.Conv2d(in_channels, out_channels, kernel_size, padding=(kernel_size // 2), bias=bias)
 
 
-
 class EDSRMeanShift(nn.Conv2d):
     def __init__(self, config, sign=-1):
         super(EDSRMeanShift, self).__init__(3, 3, kernel_size=1)
@@ -63,7 +52,9 @@ class EDSRMeanShift(nn.Conv2d):
 
 
 class EDSRBasicBlock(nn.Sequential):
-    def __init__(self, conv, in_channels, out_channels, kernel_size, bias=False, batch_norm=True, activation=nn.ReLU(True)):
+    def __init__(
+        self, conv, in_channels, out_channels, kernel_size, bias=False, batch_norm=True, activation=nn.ReLU(True)
+    ):
         block_module = [conv(in_channels, out_channels, kernel_size, bias=bias)]
         if batch_norm:
             block_module.append(nn.BatchNorm2d(out_channels))
@@ -173,7 +164,6 @@ EDSR_INPUTS_DOCSTRING = r"""
     """,
     EDSR_START_DOCSTRING,
 )
-
 class EDSRModel(EDSRPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
@@ -189,7 +179,10 @@ class EDSRModel(EDSRPreTrainedModel):
 
         # define body module
         edsr_body = [
-            EDSRResBlock(default_conv, num_feature_maps, kernel_size, activation=activation, res_scale=config.res_scale) for _ in range(num_res_block)
+            EDSRResBlock(
+                default_conv, num_feature_maps, kernel_size, activation=activation, res_scale=config.res_scale
+            )
+            for _ in range(num_res_block)
         ]
         edsr_body.append(default_conv(num_feature_maps, num_feature_maps, kernel_size))
 
@@ -205,11 +198,10 @@ class EDSRModel(EDSRPreTrainedModel):
         return activation_str_to_activation_dict[activation_str.lower()]
 
     @add_start_docstrings_to_model_forward(EDSR_INPUTS_DOCSTRING)
-    @replace_return_docstrings(output_type=ImageSuperResolutionOutput, config_class=_CONFIG_FOR_DOC)
+    @replace_return_docstrings(output_type=BaseModelOutputWithNoAttention, config_class=_CONFIG_FOR_DOC)
     def forward(
-        self,
-        pixel_values: Optional[torch.FloatTensor] = None,
-    ) -> Union[Tuple, ImageSuperResolutionOutput]:
+        self, pixel_values: Optional[torch.FloatTensor] = None, output_hidden_states: bool = False
+    ) -> Union[Tuple, BaseModelOutputWithNoAttention]:
         r"""
         Returns:
 
@@ -222,14 +214,24 @@ class EDSRModel(EDSRPreTrainedModel):
          >>> processor = EDSRImageProcessor.from_pretrained("")
          >>> model = EDSRForImageSuperResolution.from_pretrained("")
          ```"""
+
+        hidden_states = () if output_hidden_states else None
+
         pixel_values = self.sub_mean(pixel_values)
+        if output_hidden_states:
+            hidden_states = hidden_states + (pixel_values,)
         pixel_values = self.edsr_head(pixel_values)
+        if output_hidden_states:
+            hidden_states = hidden_states + (pixel_values,)
 
-        res = self.edsr_body(pixel_values)
-        res += pixel_values
+        residual = self.edsr_body(pixel_values)
+        pixel_values += residual
+        if output_hidden_states:
+            hidden_states = hidden_states + (pixel_values,)
 
-        return ImageSuperResolutionOutput(
-            reconstruction=pixel_values,
+        return BaseModelOutputWithNoAttention(
+            last_hidden_state=pixel_values,
+            hidden_states=hidden_states,
         )
 
 
@@ -240,8 +242,10 @@ class EDSRForImageSuperResolution(EDSRPreTrainedModel):
 
         # define tail module
         kernel_size = 3
-        edsr_tail = [EDSRUpsampler(default_conv, config.upscale, config.num_feature_maps, activation=None),
-            default_conv(config.num_feature_maps, config.num_channels, kernel_size)]
+        edsr_tail = [
+            EDSRUpsampler(default_conv, config.upscale, config.num_feature_maps, activation=None),
+            default_conv(config.num_feature_maps, config.num_channels, kernel_size),
+        ]
 
         self.upsampler = nn.Sequential(*edsr_tail)
 
@@ -271,77 +275,3 @@ class EDSRForImageSuperResolution(EDSRPreTrainedModel):
         return ImageSuperResolutionOutput(
             reconstruction=pixel_values,
         )
-
-    def forward_x8(self, *config, forward_function=None):
-        def _transform(v, op):
-            if self.precision != "single":
-                v = v.float()
-
-            v2np = v.data.cpu().numpy()
-            if op == "v":
-                tfnp = v2np[:, :, :, ::-1].copy()
-            elif op == "h":
-                tfnp = v2np[:, :, ::-1, :].copy()
-            elif op == "t":
-                tfnp = v2np.transpose((0, 1, 3, 2)).copy()
-
-            ret = torch.Tensor(tfnp).to(self.device)
-            if self.precision == "half":
-                ret = ret.half()
-
-            return ret
-
-        list_x = []
-        for a in config:
-            x = [a]
-            for tf in "v", "h", "t":
-                x.extend([_transform(_x, tf) for _x in x])
-
-            list_x.append(x)
-
-        list_y = []
-        for x in zip(*list_x):
-            y = forward_function(*x)
-            if not isinstance(y, list):
-                y = [y]
-            if not list_y:
-                list_y = [[_y] for _y in y]
-            else:
-                for _list_y, _y in zip(list_y, y):
-                    _list_y.append(_y)
-
-        for _list_y in list_y:
-            for i in range(len(_list_y)):
-                if i > 3:
-                    _list_y[i] = _transform(_list_y[i], "t")
-                if i % 4 > 1:
-                    _list_y[i] = _transform(_list_y[i], "h")
-                if (i % 4) % 2 == 1:
-                    _list_y[i] = _transform(_list_y[i], "v")
-
-        y = [torch.cat(_y, dim=0).mean(dim=0, keepdim=True) for _y in list_y]
-        if len(y) == 1:
-            y = y[0]
-
-        return y
-
-    # def load_state_dict(self, state_dict, strict=True):
-    #     own_state = self.state_dict()
-    #     for name, param in state_dict.items():
-    #         if name in own_state:
-    #             if isinstance(param, nn.Parameter):
-    #                 param = param.data
-    #             try:
-    #                 own_state[name].copy_(param)
-    #             except Exception:
-    #                 if name.find("tail") == -1:
-    #                     raise RuntimeError(
-    #                         "While copying the parameter named {}, "
-    #                         "whose dimensions in the model are {} and "
-    #                         "whose dimensions in the checkpoint are {}.".format(
-    #                             name, own_state[name].size(), param.size()
-    #                         )
-    #                     )
-    #         elif strict:
-    #             if name.find("tail") == -1:
-    #                 raise KeyError('unexpected key "{}" in state_dict'.format(name))

@@ -1,8 +1,8 @@
+import copy
+from typing import Dict
+
 from ...configuration_utils import PretrainedConfig
 from ...utils import logging
-from ..auto import CONFIG_MAPPING
-from typing import Dict, List, Optional
-import copy
 
 
 logger = logging.get_logger(__name__)
@@ -54,7 +54,6 @@ class EDSRConfig(PretrainedConfig):
 
     def __init__(
         self,
-        backbone_config: Optional[Dict] = None,
         upscale: int = 2,
         num_channels: int = 3,
         hidden_act: str = "relu",
@@ -68,27 +67,8 @@ class EDSRConfig(PretrainedConfig):
         self_ensemble: bool = True,
         **kwargs,
     ):
-        if backbone_config is None:
-            logger.info("`backbone_config` is `None`. Initializing the config with the default `ResNet` backbone.")
-            backbone_config = CONFIG_MAPPING["resnet"](
-                # image_size=224,
-                # in_channels=3,
-                # patch_size=4,
-                # embed_dim=96,
-                # depths=[2, 2, 18, 2],
-                # num_heads=[3, 6, 12, 24],
-                # window_size=7,
-                # drop_path_rate=0.3,
-                # use_absolute_embeddings=False,
-                # out_features=["stage1", "stage2", "stage3", "stage4"],
-            )
-        elif isinstance(backbone_config, dict):
-            backbone_model_type = backbone_config.get("model_type")
-            config_class = CONFIG_MAPPING[backbone_model_type]
-            backbone_config = config_class.from_dict(backbone_config)
+        # Config should not be importable.
 
-
-        self.backbone_config = backbone_config
         self.upscale = upscale
         self.num_channels = num_channels
         self.hidden_act = hidden_act
@@ -105,26 +85,8 @@ class EDSRConfig(PretrainedConfig):
 
         # This is the configuration of EDSR Baseline x2 with 16 res blocks and 64 feature maps.
         # TODO: Implement to_dict method, example at DPT Config.
-        # TODO: Remove Swin2sr references
         # TODO: push_to_hub example at mask2former
-        # TODO: Meanshift to EDSRMeanshift, BasicBlock to EDSRBlock
         # TODO: Mean and std in config
-    
-    @classmethod
-    def from_backbone_config(cls, backbone_config: PretrainedConfig, **kwargs):
-        """Instantiate a [`EDSRConfig`] (or a derived class) from a pre-trained backbone model configuration.
-
-        Args:
-            backbone_config ([`PretrainedConfig`]):
-                The backbone configuration.
-
-        Returns:
-            [`EDSRConfig`]: An instance of a configuration object
-        """
-        return cls(
-            backbone_config=backbone_config,
-            **kwargs,
-        )
 
     def to_dict(self) -> Dict[str, any]:
         """
@@ -134,6 +96,5 @@ class EDSRConfig(PretrainedConfig):
             `Dict[str, any]`: Dictionary of all the attributes that make up this configuration instance,
         """
         output = copy.deepcopy(self.__dict__)
-        output["backbone_config"] = self.backbone_config.to_dict()
         output["model_type"] = self.__class__.model_type
         return output
