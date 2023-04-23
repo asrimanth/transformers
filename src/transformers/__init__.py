@@ -295,6 +295,7 @@ _import_structure = {
         "FlavaTextConfig",
     ],
     "models.fnet": ["FNET_PRETRAINED_CONFIG_ARCHIVE_MAP", "FNetConfig"],
+    "models.focalnet": ["FOCALNET_PRETRAINED_CONFIG_ARCHIVE_MAP", "FocalNetConfig"],
     "models.fsmt": ["FSMT_PRETRAINED_CONFIG_ARCHIVE_MAP", "FSMTConfig", "FSMTTokenizer"],
     "models.funnel": ["FUNNEL_PRETRAINED_CONFIG_ARCHIVE_MAP", "FunnelConfig", "FunnelTokenizer"],
     "models.git": ["GIT_PRETRAINED_CONFIG_ARCHIVE_MAP", "GitConfig", "GitProcessor", "GitVisionConfig"],
@@ -1625,6 +1626,15 @@ else:
             "FNetLayer",
             "FNetModel",
             "FNetPreTrainedModel",
+        ]
+    )
+    _import_structure["models.focalnet"].extend(
+        [
+            "FOCALNET_PRETRAINED_MODEL_ARCHIVE_LIST",
+            "FocalNetForImageClassification",
+            "FocalNetForMaskedImageModeling",
+            "FocalNetModel",
+            "FocalNetPreTrainedModel",
         ]
     )
     _import_structure["models.fsmt"].extend(["FSMTForConditionalGeneration", "FSMTModel", "PretrainedFSMTModel"])
@@ -4028,6 +4038,7 @@ if TYPE_CHECKING:
         FlavaTextConfig,
     )
     from .models.fnet import FNET_PRETRAINED_CONFIG_ARCHIVE_MAP, FNetConfig
+    from .models.focalnet import FOCALNET_PRETRAINED_CONFIG_ARCHIVE_MAP, FocalNetConfig
     from .models.fsmt import FSMT_PRETRAINED_CONFIG_ARCHIVE_MAP, FSMTConfig, FSMTTokenizer
     from .models.funnel import FUNNEL_PRETRAINED_CONFIG_ARCHIVE_MAP, FunnelConfig, FunnelTokenizer
     from .models.git import GIT_PRETRAINED_CONFIG_ARCHIVE_MAP, GitConfig, GitProcessor, GitVisionConfig
@@ -5170,6 +5181,13 @@ if TYPE_CHECKING:
             FNetLayer,
             FNetModel,
             FNetPreTrainedModel,
+        )
+        from .models.focalnet import (
+            FOCALNET_PRETRAINED_MODEL_ARCHIVE_LIST,
+            FocalNetForImageClassification,
+            FocalNetForMaskedImageModeling,
+            FocalNetModel,
+            FocalNetPreTrainedModel,
         )
         from .models.fsmt import FSMTForConditionalGeneration, FSMTModel, PretrainedFSMTModel
         from .models.funnel import (
