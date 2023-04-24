@@ -92,9 +92,9 @@ def convert_edsr_checkpoint(checkpoint_url: str, pytorch_dump_folder_path: str, 
     SAMPLE_IMAGE_URL = "https://lh4.googleusercontent.com/-Anmw5df4gj0/AAAAAAAAAAI/AAAAAAAAAAc/6HxU8XFLnQE/photo.jpg64"
 
     url_to_name_dict = {
-        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x2-1bc95232.pt": "edsr_baseline_x2",
-        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x3-abf2a44e.pt": "edsr_baseline_x3",
-        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x4-6b446fab.pt": "edsr_baseline_x4",
+        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x2-1bc95232.pt": "edsr-base-x2",
+        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x3-abf2a44e.pt": "edsr-base-x3",
+        "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x4-6b446fab.pt": "edsr-base-x4",
     }
     url_to_slice_dict = {
         "https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x2-1bc95232.pt": torch.tensor(
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     # Required parameters
     parser.add_argument(
         "--checkpoint_url",
-        default="https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x4-6b446fab.pt",
+        default="https://cv.snu.ac.kr/research/EDSR/models/edsr_baseline_x2-1bc95232.pt",
         type=str,
         help="URL of the original EDSR checkpoint you'd like to convert.",
     )

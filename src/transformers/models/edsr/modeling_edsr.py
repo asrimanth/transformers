@@ -20,17 +20,17 @@ logger = logging.get_logger(__name__)
 
 # General docstring
 _CONFIG_FOR_DOC = "EDSRConfig"
-_FEAT_EXTRACTOR_FOR_DOC = "AutoFeatureExtractor"
+_FEAT_EXTRACTOR_FOR_DOC = "EDSRImageProcessor"
 
 # Base docstring
-# _CHECKPOINT_FOR_DOC = ""
+_CHECKPOINT_FOR_DOC = "asrimanth/edsr-base-x2"
 
 
-EDSR_PRETRAINED_MODEL_ARCHIVE_LIST = {
-    "huggingface/edsr-base-x2": "https://huggingface.co/huggingface/edsr-base-x2/resolve/main/config.json",
-    "huggingface/edsr-base-x3": "https://huggingface.co/huggingface/edsr-base-x3/resolve/main/config.json",
-    "huggingface/edsr-base-x4": "https://huggingface.co/huggingface/edsr-base-x4/resolve/main/config.json",
-    "huggingface/edsr-x2": "https://huggingface.co/huggingface/edsr-x2/resolve/main/config.json",
+EDSR_PRETRAINED_MODEL_ARCHIVE_LIST = ["asrimanth/edsr-base-x2", "asrimanth/edsr-base-x3", "asrimanth/edsr-base-x4"]
+temp = {
+    "asrimanth/edsr-baseline-x2": "https://huggingface.co/huggingface/edsr-base-x2/resolve/main/config.json",
+    "asrimanth/edsr-baseline-x3": "https://huggingface.co/huggingface/edsr-base-x3/resolve/main/config.json",
+    "asrimanth/edsr-baseline-x4": "https://huggingface.co/huggingface/edsr-base-x4/resolve/main/config.json",
 }
 
 
@@ -160,7 +160,7 @@ EDSR_INPUTS_DOCSTRING = r"""
 
 @add_start_docstrings(
     """
-    EDSR Model transformer with an EDSRUpsampler head on top for image super resolution and restoration.
+    The bare EDSR Model without an EDSRUpsampler head on top for image super resolution and restoration.
     """,
     EDSR_START_DOCSTRING,
 )
@@ -211,9 +211,10 @@ class EDSRModel(EDSRPreTrainedModel):
          >>> from transformers import EDSRImageProcessor, EDSRForImageSuperResolution
          >>> from datasets import load_dataset
 
-         >>> processor = EDSRImageProcessor.from_pretrained("")
-         >>> model = EDSRForImageSuperResolution.from_pretrained("")
-         ```"""
+         >>> processor = EDSRImageProcessor.from_pretrained("asrimanth/edsr-base-x2")
+         >>> model = EDSRForImageSuperResolution.from_pretrained("asrimanth/edsr-base-x2")
+         ```
+         """
 
         hidden_states = () if output_hidden_states else None
 
@@ -235,6 +236,12 @@ class EDSRModel(EDSRPreTrainedModel):
         )
 
 
+@add_start_docstrings(
+    """
+    EDSR Model with an upsampler head on top (a final layer on top of the feature maps), for image super resolution and restoration.
+    """,
+    EDSR_START_DOCSTRING,
+)
 class EDSRForImageSuperResolution(EDSRPreTrainedModel):
     def __init__(self, config):
         super(EDSRPreTrainedModel, self).__init__(config)
@@ -264,8 +271,8 @@ class EDSRForImageSuperResolution(EDSRPreTrainedModel):
          >>> from transformers import EDSRImageProcessor, EDSRForImageSuperResolution
          >>> from datasets import load_dataset
 
-         >>> processor = EDSRImageProcessor.from_pretrained("")
-         >>> model = EDSRForImageSuperResolution.from_pretrained("")
+         >>> processor = EDSRImageProcessor.from_pretrained("asrimanth/edsr-base-x2")
+         >>> model = EDSRForImageSuperResolution.from_pretrained("asrimanth/edsr-base-x2")
          ```"""
 
         pixel_values = self.edsr_model(pixel_values)[0]

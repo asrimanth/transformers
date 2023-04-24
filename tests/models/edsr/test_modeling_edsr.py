@@ -28,7 +28,7 @@ if is_torch_available():
     import torch
     from torch import nn
 
-    from transformers import EDSRForImageSuperResolution, EDSRModel
+    from transformers import EDSRForImageSuperResolution, EDSRModel, EDSRImageProcessor
     from transformers.models.edsr.modeling_edsr import EDSR_PRETRAINED_MODEL_ARCHIVE_LIST
 
 if is_vision_available():
@@ -38,16 +38,17 @@ if is_vision_available():
 class EDSRModelTester:
     def __init__(
         self,
-        upscale=2,
-        num_channels=3,
-        batch_size=8,
-        image_size=128,
-        hidden_act="relu",
-        num_res_block=16,
-        num_feature_maps=64,
-        res_scale=1,
-        shift_mean=True,
-        self_ensemble=True,
+        upscale: int = 2,
+        num_channels: int = 3,
+        batch_size: int = 8,
+        image_size: int = 128,
+        hidden_act: str = "relu",
+        num_res_block: int = 16,
+        num_feature_maps: int = 64,
+        res_scale: int = 1,
+        rgb_range: int = 255,
+        rgb_mean: tuple = (0.4488, 0.4371, 0.4040),
+        rgb_std: tuple = (1.0, 1.0, 1.0),
         **kwargs,
     ):
         self.upscale = upscale
@@ -57,15 +58,14 @@ class EDSRModelTester:
         self.num_res_block = num_res_block
         self.num_feature_maps = num_feature_maps
         self.res_scale = res_scale
-        self.shift_mean = shift_mean
-        self.self_ensemble = self_ensemble
         self.image_size = image_size
+        self.rgb_range = rgb_range
+        self.rgb_mean = rgb_mean
+        self.rgb_std = rgb_std
 
     def prepare_config_and_inputs(self):
         pixel_values = floats_tensor([self.batch_size, self.num_channels, self.image_size, self.image_size])
-
         config = self.get_config()
-
         return config, pixel_values
 
     def get_config(self):
@@ -75,8 +75,6 @@ class EDSRModelTester:
             num_res_block=self.num_res_block,
             num_feature_maps=self.num_feature_maps,
             res_scale=self.res_scale,
-            shift_mean=self.shift_mean,
-            self_ensemble=self.self_ensemble,
         )
 
     def create_and_check_model(self, config, pixel_values):
@@ -86,7 +84,7 @@ class EDSRModelTester:
         result = model(pixel_values)
 
         self.parent.assertEqual(
-            result.last_hidden_state.shape, (self.batch_size, self.embed_dim, self.image_size, self.image_size)
+            result.last_hidden_state.shape, (self.batch_size, self.num_feature_maps, self.image_size, self.image_size)
         )
 
     def create_and_check_for_image_super_resolution(self, config, pixel_values):
@@ -95,10 +93,11 @@ class EDSRModelTester:
         model.eval()
         result = model(pixel_values)
 
-        expected_image_size = self.image_size * self.upscale
+        expected_width = self.image_size[-2] * self.upscale
+        expected_height = self.image_size[-1] * self.upscale
 
         self.parent.assertEqual(
-            result.reconstruction.shape, (self.batch_size, self.num_channels, expected_image_size, expected_image_size)
+            result.reconstruction.shape, (self.batch_size, self.num_channels, expected_width, expected_height)
         )
 
     def prepare_config_and_inputs_for_common(self):
@@ -120,7 +119,7 @@ class EDSRModelTest(ModelTesterMixin, unittest.TestCase):
 
     def setUp(self):
         self.model_tester = EDSRModelTester(self)
-        self.config_tester = ConfigTester(self, config_class=EDSRConfig, embed_dim=37)
+        self.config_tester = ConfigTester(self, config_class=EDSRConfig, has_text_modality=False)
 
     def test_config(self):
         self.config_tester.create_and_test_config_to_json_string()
@@ -150,14 +149,20 @@ class EDSRModelTest(ModelTesterMixin, unittest.TestCase):
     def test_training_gradient_checkpointing(self):
         pass
 
+    @unittest.skip(reason="EDSRNet does not support input and output embeddings")
     def test_model_common_attributes(self):
-        config, _ = self.model_tester.prepare_config_and_inputs_for_common()
+        # config, _ = self.model_tester.prepare_config_and_inputs_for_common()
 
-        for model_class in self.all_model_classes:
-            model = model_class(config)
-            self.assertIsInstance(model.get_input_embeddings(), (nn.Module))
-            x = model.get_output_embeddings()
-            self.assertTrue(x is None or isinstance(x, nn.Linear))
+        # for model_class in self.all_model_classes:
+        #     model = model_class(config)
+        #     self.assertIsInstance(model.get_input_embeddings(), (nn.Module))
+        #     x = model.get_output_embeddings()
+        #     self.assertTrue(x is None or isinstance(x, nn.Linear))
+        pass
+
+    @unittest.skip(reason="EDSRNet does not support attention")
+    def test_attention_outputs(self):
+        pass
 
     def test_forward_signature(self):
         config, _ = self.model_tester.prepare_config_and_inputs_for_common()
@@ -173,7 +178,7 @@ class EDSRModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in EDSR_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
+        for model_name in EDSR_PRETRAINED_MODEL_ARCHIVE_LIST:
             model = EDSRModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
@@ -201,8 +206,8 @@ class EDSRModelIntegrationTest(unittest.TestCase):
     @slow
     def test_inference_image_super_resolution_head(self):
         # TODO update to appropriate organization
-        model = EDSRForImageSuperResolution.from_pretrained("edsr-base-x2").to(torch_device)
-        processor = self.default_feature_extractor
+        model = EDSRForImageSuperResolution.from_pretrained("asrimanth/edsr-base-x2").to(torch_device)
+        processor = EDSRImageProcessor.from_pretrained("asrimanth/edsr-base-x2")
 
         image = Image.open("./tests/fixtures/tests_samples/COCO/000000039769.png")
         inputs = processor(images=image, return_tensors="pt").to(torch_device)

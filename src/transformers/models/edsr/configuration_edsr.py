@@ -7,7 +7,11 @@ from ...utils import logging
 
 logger = logging.get_logger(__name__)
 
-EDSR_PRETRAINED_CONFIG_ARCHIVE_MAP = {}
+EDSR_PRETRAINED_CONFIG_ARCHIVE_MAP = {
+    "asrimanth/edsr-base-x2": "https://huggingface.co/asrimanth/edsr-base-x2/blob/main/config.json",
+    "asrimanth/edsr-base-x3": "https://huggingface.co/asrimanth/edsr-base-x3/blob/main/config.json",
+    "asrimanth/edsr-base-x4": "https://huggingface.co/asrimanth/edsr-base-x4/blob/main/config.json",
+}
 
 
 class EDSRConfig(PretrainedConfig):
