@@ -15,6 +15,7 @@
 """ Testing suite for the PyTorch EDSR model. """
 import inspect
 import unittest
+import requests
 
 from transformers import EDSRConfig, EDSRModel
 from transformers.testing_utils import require_torch, require_vision, slow, torch_device
@@ -22,7 +23,6 @@ from transformers.utils import is_torch_available, is_vision_available
 
 from ...test_configuration_common import ConfigTester
 from ...test_modeling_common import ModelTesterMixin, _config_zero_init, floats_tensor
-
 
 if is_torch_available():
     import torch
@@ -47,18 +47,18 @@ class EDSRModelTester:
         num_feature_maps: int = 64,
         res_scale: int = 1,
         rgb_range: int = 255,
-        rgb_mean: tuple = (0.4488, 0.4371, 0.4040),
-        rgb_std: tuple = (1.0, 1.0, 1.0),
+        rgb_mean: list = [0.4488, 0.4371, 0.4040],
+        rgb_std: list = [1.0, 1.0, 1.0],
         **kwargs,
     ):
         self.upscale = upscale
-        self.batch_size = batch_size
         self.num_channels = num_channels
+        self.batch_size = batch_size
+        self.image_size = image_size
         self.hidden_act = hidden_act
         self.num_res_block = num_res_block
         self.num_feature_maps = num_feature_maps
         self.res_scale = res_scale
-        self.image_size = image_size
         self.rgb_range = rgb_range
         self.rgb_mean = rgb_mean
         self.rgb_std = rgb_std
@@ -71,10 +71,14 @@ class EDSRModelTester:
     def get_config(self):
         return EDSRConfig(
             upscale=self.upscale,
+            num_channels=self.num_channels,
             hidden_act=self.hidden_act,
             num_res_block=self.num_res_block,
             num_feature_maps=self.num_feature_maps,
             res_scale=self.res_scale,
+            rgb_range=self.rgb_range,
+            rgb_mean=self.rgb_mean,
+            rgb_std=self.rgb_std,
         )
 
     def create_and_check_model(self, config, pixel_values):
@@ -93,11 +97,9 @@ class EDSRModelTester:
         model.eval()
         result = model(pixel_values)
 
-        expected_width = self.image_size[-2] * self.upscale
-        expected_height = self.image_size[-1] * self.upscale
-
         self.parent.assertEqual(
-            result.reconstruction.shape, (self.batch_size, self.num_channels, expected_width, expected_height)
+            result.reconstruction.shape, 
+            (self.batch_size, self.num_channels, self.image_size * self.upscale, self.image_size * self.upscale)
         )
 
     def prepare_config_and_inputs_for_common(self):
@@ -206,18 +208,38 @@ class EDSRModelIntegrationTest(unittest.TestCase):
     @slow
     def test_inference_image_super_resolution_head(self):
         # TODO update to appropriate organization
-        model = EDSRForImageSuperResolution.from_pretrained("asrimanth/edsr-base-x2").to(torch_device)
-        processor = EDSRImageProcessor.from_pretrained("asrimanth/edsr-base-x2")
+        image_url = "https://lh4.googleusercontent.com/-Anmw5df4gj0/AAAAAAAAAAI/AAAAAAAAAAc/6HxU8XFLnQE/photo.jpg64"
+        url_to_slice_dict = {
+            "asrimanth/edsr-base-x2": torch.tensor(
+                [[1.0845, 0.1934, 0.1843],[0.6235, 0.2663, 0.0347],[0.5703, -0.0288,  0.1822]]
+            ),
+            "asrimanth/edsr-base-x3": torch.tensor(
+                [[1.8288, 0.5871, 0.2986],[0.7461, 0.6465, 0.1928],[0.4508, 0.3917, 0.3607]]
+            ),
+            "asrimanth/edsr-base-x4": torch.tensor([
+                [1.6611, 0.6265, 0.3864],[0.9503, 0.3109, 0.1029],[0.5610, 0.3287, 0.4297]]
+            ),
+        }
 
-        image = Image.open("./tests/fixtures/tests_samples/COCO/000000039769.png")
-        inputs = processor(images=image, return_tensors="pt").to(torch_device)
+        for repo_url, expected_slice in url_to_slice_dict.items():
+            model = EDSRForImageSuperResolution.from_pretrained(repo_url).to(torch_device)
+            processor = EDSRImageProcessor.from_pretrained(repo_url)
 
-        # forward pass
-        with torch.no_grad():
-            outputs = model(**inputs)
+            image = Image.open(requests.get(image_url, stream=True).raw).convert("RGB")
+            # image = Image.open("./tests/fixtures/tests_samples/COCO/000000039769.png")
+            inputs = processor(images=image, return_tensors="pt").to(torch_device)
 
-        # verify the logits
-        expected_shape = torch.Size((1, 1000))
-        self.assertEqual(outputs.logits.shape, expected_shape)
-        expected_slice = torch.tensor([-0.3947, -0.4306, 0.0026]).to(torch_device)
-        self.assertTrue(torch.allclose(outputs.logits[0, :3], expected_slice, atol=1e-4))
+            # forward pass
+            with torch.no_grad():
+                outputs = model(**inputs)
+
+            # verify the slices
+            upscale = int(repo_url[-1])
+            expected_shape = inputs.pixel_values.shape
+            expected_shape = torch.Size([expected_shape[0], expected_shape[1], expected_shape[2] * upscale, expected_shape[3] * upscale])
+
+            self.assertEqual(outputs.reconstruction.shape, expected_shape)
+            expected_slice = expected_slice.to(torch_device)
+            print(inputs.pixel_values[0, 0, :3, :3], outputs.reconstruction[0, 0, :3, :3], expected_slice)
+            self.assertTrue(torch.allclose(outputs.reconstruction[0, 0, :3, :3], expected_slice, atol=1e-4))
+            break

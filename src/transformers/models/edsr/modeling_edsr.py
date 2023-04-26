@@ -88,7 +88,9 @@ class EDSRResBlock(nn.Module):
 class EDSRUpsampler(nn.Sequential):
     def __init__(self, conv, scale, n_feats, batch_norm=False, activation=nn.ReLU(True), bias=True):
         upsample_module = []
-        if (scale & (scale - 1)) == 0:  # Is scale = 2^n?
+        scale = int(scale)
+        # if (scale & (scale - 1)) == 0:  # Is scale = 2^n?
+        if scale == 2 or scale == 4:  # Is scale = 2^n?
             for _ in range(int(math.log(scale, 2))):
                 upsample_module.append(conv(n_feats, 4 * n_feats, 3, bias))
                 upsample_module.append(nn.PixelShuffle(2))
@@ -105,6 +107,7 @@ class EDSRUpsampler(nn.Sequential):
             if activation is not None:
                 upsample_module.append(activation)
         else:
+            print(scale, type(scale))
             raise NotImplementedError
 
         super(EDSRUpsampler, self).__init__(*upsample_module)
